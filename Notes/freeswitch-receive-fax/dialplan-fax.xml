@@ -1,0 +1,94 @@
+<!-- FreeSWITCH Dialplan for Fax Handling -->
+<!-- Place this in /usr/local/freeswitch/conf/dialplan/public/ -->
+
+<include>
+  <!-- Inbound Fax Detection -->
+  <extension name="inbound_fax_detection">
+    <condition field="destination_number" expression="^(\d+)$">
+      <!-- Enable T.38 fax detection -->
+      <action application="set" data="fax_enable_t38=true"/>
+      <action application="set" data="fax_enable_t38_request=true"/>
+      <action application="set" data="fax_verbose=true"/>
+      
+      <!-- Start tone detection for fax -->
+      <action application="tone_detect" data="fax 1100 r +5000 transfer 'fax_receive' 1"/>
+      
+      <!-- Answer the call -->
+      <action application="answer"/>
+      
+      <!-- Wait for fax tone or proceed with normal call -->
+      <action application="sleep" data="3000"/>
+      
+      <!-- If no fax detected, handle as voice call -->
+      <action application="bridge" data="user/${destination_number}"/>
+    </condition>
+  </extension>
+  
+  <!-- Fax Receive Extension -->
+  <extension name="fax_receive">
+    <condition field="destination_number" expression="^fax_receive$">
+      <!-- Set fax parameters -->
+      <action application="set" data="fax_ident=${destination_number}"/>
+      <action application="set" data="fax_header=Received on ${strftime(%Y-%m-%d %H:%M)}"/>
+      <action application="set" data="fax_verbose=true"/>
+      <action application="set" data="fax_use_ecm=true"/>
+      
+      <!-- Generate unique filename -->
+      <action application="set" data="fax_file_name=${strftime(%Y%m%d_%H%M%S)}_${uuid}.tiff"/>
+      <action application="set" data="fax_file_path=/opt/fs-service/fax_files/rx/${fax_file_name}"/>
+      
+      <!-- Receive the fax -->
+      <action application="rxfax" data="${fax_file_path}"/>
+      
+      <!-- Execute post-processing script on hangup -->
+      <action application="set" data="api_on_hangup=system python3 /opt/fs-service/Notes/freeswitch-receive-fax/process-fax-events.py"/>
+    </condition>
+  </extension>
+  
+  <!-- Dedicated Fax Numbers -->
+  <extension name="dedicated_fax_numbers">
+    <!-- List specific fax numbers here -->
+    <condition field="destination_number" expression="^(18884732963|fax_number_2|fax_number_3)$">
+      <!-- This is a dedicated fax line, go straight to fax receive -->
+      <action application="answer"/>
+      
+      <!-- Set fax parameters -->
+      <action application="set" data="fax_ident=${destination_number}"/>
+      <action application="set" data="fax_local_station_id=${destination_number}"/>
+      <action application="set" data="fax_verbose=true"/>
+      <action application="set" data="fax_use_ecm=true"/>
+      
+      <!-- Generate unique filename -->
+      <action application="set" data="fax_file_name=${strftime(%Y%m%d_%H%M%S)}_${uuid}.tiff"/>
+      <action application="set" data="fax_file_path=/opt/fs-service/fax_files/rx/${fax_file_name}"/>
+      
+      <!-- Log the incoming fax -->
+      <action application="log" data="INFO Receiving fax on ${destination_number} from ${caller_id_number}"/>
+      
+      <!-- Receive the fax -->
+      <action application="rxfax" data="${fax_file_path}"/>
+      
+      <!-- Set variables for post-processing -->
+      <action application="set" data="fax_image=${fax_file_path}"/>
+      <action application="set" data="fax_local_station_id=${destination_number}"/>
+      <action application="set" data="fax_remote_station_id=${caller_id_number}"/>
+      
+      <!-- Execute post-processing script -->
+      <action application="system" data="python3 /opt/fs-service/Notes/freeswitch-receive-fax/process-fax-events.py"/>
+    </condition>
+  </extension>
+  
+  <!-- Outbound Fax Handling (for reference) -->
+  <extension name="outbound_fax">
+    <condition field="destination_number" expression="^fax_out_(.+)$">
+      <action application="set" data="fax_destination=$1"/>
+      <action application="set" data="fax_verbose=true"/>
+      <action application="set" data="fax_use_ecm=false"/>
+      <action application="set" data="fax_enable_t38=true"/>
+      <action application="set" data="fax_enable_t38_request=false"/>
+      
+      <!-- Execute post-processing on completion -->
+      <action application="set" data="api_on_hangup=system python3 /opt/fs-service/Notes/freeswitch-receive-fax/process-fax-events.py"/>
+    </condition>
+  </extension>
+</include>

@@ -18,6 +18,6 @@ from django.contrib import admin
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('select2/', include('django_select2.urls')),
     path('api/', include('main.apps.core.urls')), # , namespace='api'
+    path('api/fax/', include('main.apps.fax.urls')),
 ]

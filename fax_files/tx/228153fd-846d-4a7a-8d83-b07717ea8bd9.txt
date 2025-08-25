@@ -1,0 +1,17 @@
+This is a test fax document.
+
+Testing the Fax API System
+==========================
+
+Date: 2024-08-24
+Subject: Fax API Test
+
+This document is being used to test the fax transmission system.
+
+Features tested:
+1. File upload
+2. Fax sending
+3. Status tracking
+4. Transaction listing
+
+End of test document.

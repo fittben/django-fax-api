@@ -1,0 +1,13 @@
+FAX TEST DOCUMENT
+=================
+Date: Sun Aug 24 06:53:27 AM EDT 2025
+Test ID: 95f78d65-da24-4b45-9ab5-5a8eee022d59
+
+This is a test fax transmission
+using FreeSWITCH and Django API.
+
+Line 1: Testing
+Line 2: More testing
+Line 3: Final test
+
+End of document.

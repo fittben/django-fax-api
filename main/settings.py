@@ -14,7 +14,7 @@ env.read_env('.env')
 
 SECRET_KEY = env("SECRET_KEY", default='a9+%*++pt-@cqc=*56ir9)+#m!zsk2paw-8+d-0(zcdpr*tio7')
 
-DEBUG = env.bool("DEBUG", False)
+DEBUG = env.bool("DEBUG", True)
 
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['*'])
 
@@ -33,7 +33,6 @@ INSTALLED_APPS = [
     #'django.contrib.sites',
 
     # 3rd-part apps
-    'compat',
     'import_export',
     'rest_framework',
     'rest_framework.authtoken',
@@ -42,6 +41,7 @@ INSTALLED_APPS = [
     'main.apps.core',
     'main.apps.gateway',
     'main.apps.service',
+    'main.apps.fax',
     'main.utils.esl',
 ]
 MIDDLEWARE = [
@@ -76,20 +76,8 @@ WSGI_APPLICATION = 'main.wsgi.application'
 
 
 DATABASES = {
-    'default': env.db('DEFAULTDB_URL'),
-    'cdr-pusher': env.db('CDRPUSHERDB_URL'),
-    # 'default': {
-    #     'ENGINE': 'django.db.backends.sqlite3',
-    #     'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-    # },
-    # 'cdr-pusher': {
-    #     'NAME': 'cdr-pusher',
-    #     'HOST': '0.0.0.0',
-    #     'ENGINE': 'django.db.backends.postgresql',
-    #     'USER': 'postgres',
-    #     'PASSWORD': '123',
-    #     'PORT': 5432,
-    # }
+    'default': env.db('DEFAULTDB_URL', default='sqlite:///db.sqlite3'),
+    # Removed CDR pusher database configuration
 }
 
 AUTH_PASSWORD_VALIDATORS = [

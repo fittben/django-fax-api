@@ -1,5 +1,5 @@
 from .audio import Audio
-from .fax import Fax
+from .fax_simple import FaxSimple
 from ..vars import GATEWAY_PREFIX
 
 class Manager(object):
@@ -17,6 +17,7 @@ class Manager(object):
 			am = Audio(self.name, self.username, self.file_path, self.numbers)
 			body = am.execute()
 		elif self.service == "fax":
-			fm = Fax(self.name, self.username, self.file_path, self.numbers)
+			# Use simplified fax handler without CDR pusher
+			fm = FaxSimple(self.username, self.file_path, self.numbers)
 			body = fm.execute()
 		return body

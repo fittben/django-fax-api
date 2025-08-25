@@ -1,4 +1,4 @@
-import main.utils.esl.ESL as ESL
+import main.utils.esl.ESL_py3 as ESL
 from ..vars import FREESWITCH_IP_ADDRESS, FREESWITCH_PORT, FREESWITCH_PASSWORD
 import os, uuid
 from main.apps.service.models import CDRDetailed
@@ -41,16 +41,17 @@ class Fax(object):
 				dicto["body"] = res.getBody()
 				dicto["event-name"] = res.getHeader("Event-Name")
 				dicto["job-uuid"] = self.core_uuid #res.getHeader("Job-UUID")
-				cdr_d = CDRDetailed(
-					cli=dicto["cli"],
-					cld=dicto["cld"],
-					file=dicto["file"],
-					body=dicto["body"],
-					job_uuid=dicto["job-uuid"],
-					uuid=self.uuid,
-					event_name=dicto["event-name"],
-				)
-				cdr_d.save(using="cdr-pusher")
+				# CDR pusher removed - logging details instead
+				# cdr_d = CDRDetailed(
+				# 	cli=dicto["cli"],
+				# 	cld=dicto["cld"],
+				# 	file=dicto["file"],
+				# 	body=dicto["body"],
+				# 	job_uuid=dicto["job-uuid"],
+				# 	uuid=self.uuid,
+				# 	event_name=dicto["event-name"],
+				# )
+				# cdr_d.save(using="cdr-pusher")
 				listo.append(dicto)
 				#con.api("uuid_kill", self.uuid) # this will kill all the hole originate channel
 			args["details"] = listo

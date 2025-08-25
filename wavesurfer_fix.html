@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WaveSurfer Subtitle Editor Fix</title>
+    
+    <!-- WaveSurfer.js CDN - Use UMD build instead of ESM -->
+    <script src="https://unpkg.com/wavesurfer.js@7/dist/wavesurfer.min.js"></script>
+    <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.min.js"></script>
+    
+    <style>
+        #waveform {
+            width: 100%;
+            height: 128px;
+            border: 1px solid #ddd;
+            margin: 20px 0;
+        }
+        
+        .error-message {
+            color: red;
+            padding: 10px;
+            background: #ffeeee;
+            border: 1px solid red;
+            border-radius: 4px;
+            margin: 10px 0;
+            display: none;
+        }
+        
+        .not-available {
+            padding: 20px;
+            background: #f5f5f5;
+            text-align: center;
+            color: #666;
+            border-radius: 4px;
+        }
+        
+        .subtitle-region {
+            background: rgba(0, 123, 255, 0.3) !important;
+            border: 1px solid #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Subtitle Editor</h1>
+        
+        <div id="error-message" class="error-message"></div>
+        <div id="not-available" class="not-available" style="display:none;">
+            Media not available
+        </div>
+        
+        <div id="waveform"></div>
+        
+        <div id="controls">
+            <button id="play-pause">Play/Pause</button>
+            <button id="add-region">Add Region</button>
+        </div>
+        
+        <div id="regions-list"></div>
+    </div>
+
+    <script>
+        // Fixed WaveSurfer initialization with proper error handling
+        let wavesurfer = null;
+        let regions = null;
+        
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+        
+        function showNotAvailable() {
+            document.getElementById('not-available').style.display = 'block';
+            document.getElementById('waveform').style.display = 'none';
+            document.getElementById('controls').style.display = 'none';
+        }
+        
+        async function initWaveform() {
+            try {
+                // Check if WaveSurfer is available
+                if (typeof WaveSurfer === 'undefined') {
+                    throw new Error('WaveSurfer.js not loaded');
+                }
+                
+                // Initialize WaveSurfer with error handling
+                wavesurfer = WaveSurfer.create({
+                    container: '#waveform',
+                    waveColor: '#4F4F4F',
+                    progressColor: '#007bff',
+                    cursorColor: '#ff0000',
+                    barWidth: 2,
+                    barRadius: 3,
+                    responsive: true,
+                    height: 128,
+                    normalize: true,
+                    backend: 'WebAudio',
+                    plugins: []
+                });
+                
+                // Initialize Regions plugin if available
+                if (WaveSurfer.regions) {
+                    regions = wavesurfer.registerPlugin(WaveSurfer.regions.create());
+                    
+                    // Set up region events
+                    regions.on('region-created', (region) => {
+                        console.log('Region created:', region);
+                        updateRegionsList();
+                    });
+                    
+                    regions.on('region-updated', (region) => {
+                        console.log('Region updated:', region);
+                        updateRegionsList();
+                    });
+                    
+                    regions.on('region-removed', (region) => {
+                        console.log('Region removed:', region);
+                        updateRegionsList();
+                    });
+                }
+                
+                // Load media with error handling
+                await loadMedia();
+                
+            } catch (error) {
+                console.error('Failed to initialize WaveSurfer:', error);
+                showError('Failed to initialize audio player: ' + error.message);
+                showNotAvailable();
+            }
+        }
+        
+        async function loadMedia() {
+            try {
+                // Get job ID from URL or use default
+                const jobId = getJobIdFromUrl() || '138';
+                const mediaUrl = `/transcription/api/jobs/${jobId}/media/`;
+                
+                // Check if media is available
+                const response = await fetch(mediaUrl, {
+                    method: 'HEAD',
+                    headers: {
+                        'Accept': 'audio/*'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Media not available (${response.status})`);
+                }
+                
+                // Load the audio
+                await wavesurfer.load(mediaUrl);
+                
+                // Load segments after audio is loaded
+                await loadSegments(jobId);
+                
+            } catch (error) {
+                console.error('Error loading media:', error);
+                showError('Media not available: ' + error.message);
+                showNotAvailable();
+            }
+        }
+        
+        async function loadSegments(jobId) {
+            try {
+                const response = await fetch(`/transcription/api/jobs/${jobId}/segments/`);
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to load segments (${response.status})`);
+                }
+                
+                const segments = await response.json();
+                createRegions(segments);
+                
+            } catch (error) {
+                console.error('Error loading segments:', error);
+                // Don't show as critical error - segments are optional
+                console.warn('Segments not available, continuing without them');
+            }
+        }
+        
+        function createRegions(segments) {
+            if (!regions) {
+                console.warn('Regions plugin not available');
+                return;
+            }
+            
+            // Clear existing regions safely
+            if (regions.getRegions) {
+                regions.getRegions().forEach(region => region.remove());
+            }
+            
+            // Create regions from segments
+            segments.forEach((segment, index) => {
+                const region = regions.addRegion({
+                    start: segment.start_time,
+                    end: segment.end_time,
+                    content: segment.text || '',
+                    color: `rgba(0, 123, 255, 0.${index % 3 + 2})`,
+                    drag: true,
+                    resize: true,
+                    id: segment.id || `region-${index}`
+                });
+            });
+            
+            updateRegionsList();
+        }
+        
+        function updateRegionsList() {
+            const listDiv = document.getElementById('regions-list');
+            listDiv.innerHTML = '<h3>Subtitle Regions:</h3>';
+            
+            if (!regions || !regions.getRegions) {
+                listDiv.innerHTML += '<p>No regions available</p>';
+                return;
+            }
+            
+            const regionsList = regions.getRegions();
+            
+            if (regionsList.length === 0) {
+                listDiv.innerHTML += '<p>No regions created yet</p>';
+                return;
+            }
+            
+            regionsList.forEach((region, index) => {
+                const regionDiv = document.createElement('div');
+                regionDiv.className = 'region-item';
+                regionDiv.innerHTML = `
+                    <div style="margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 4px;">
+                        <strong>Region ${index + 1}</strong><br>
+                        Start: ${region.start.toFixed(2)}s | End: ${region.end.toFixed(2)}s<br>
+                        <input type="text" value="${region.content || ''}" 
+                               placeholder="Enter subtitle text"
+                               onchange="updateRegionContent('${region.id}', this.value)"
+                               style="width: 100%; margin-top: 5px;">
+                        <button onclick="removeRegion('${region.id}')" style="margin-top: 5px;">Remove</button>
+                    </div>
+                `;
+                listDiv.appendChild(regionDiv);
+            });
+        }
+        
+        function updateRegionContent(regionId, content) {
+            if (!regions) return;
+            
+            const region = regions.getRegions().find(r => r.id === regionId);
+            if (region) {
+                region.content = content;
+                region.update({ content: content });
+            }
+        }
+        
+        function removeRegion(regionId) {
+            if (!regions) return;
+            
+            const region = regions.getRegions().find(r => r.id === regionId);
+            if (region) {
+                region.remove();
+            }
+        }
+        
+        function getJobIdFromUrl() {
+            const pathMatch = window.location.pathname.match(/job\/(\d+)/);
+            return pathMatch ? pathMatch[1] : null;
+        }
+        
+        // Initialize controls
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize waveform
+            initWaveform();
+            
+            // Play/Pause button
+            document.getElementById('play-pause').addEventListener('click', () => {
+                if (wavesurfer) {
+                    wavesurfer.playPause();
+                }
+            });
+            
+            // Add region button
+            document.getElementById('add-region').addEventListener('click', () => {
+                if (!wavesurfer || !regions) {
+                    showError('Audio not loaded or regions not available');
+                    return;
+                }
+                
+                const duration = wavesurfer.getDuration();
+                const currentTime = wavesurfer.getCurrentTime();
+                
+                regions.addRegion({
+                    start: currentTime,
+                    end: Math.min(currentTime + 5, duration),
+                    content: 'New subtitle',
+                    color: 'rgba(0, 123, 255, 0.3)',
+                    drag: true,
+                    resize: true
+                });
+            });
+        });
+        
+        // Make functions globally available for inline handlers
+        window.updateRegionContent = updateRegionContent;
+        window.removeRegion = removeRegion;
+    </script>
+</body>
+</html>
